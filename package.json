@@ -1,0 +1,23 @@
+{
+  "name": "@nbardy/agent-cli",
+  "version": "0.1.0",
+  "description": "Shared CLI agent invocation tool — single source of truth for invoking Claude, Codex, OpenCode, Gemini CLIs",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "bin": {
+    "agent-cli": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test dist/test/build.test.js",
+    "pretest": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.8.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

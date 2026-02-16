@@ -1,0 +1,62 @@
+import type { HarnessConfig } from '../types';
+
+/**
+ * Codex CLI harness config.
+ *
+ * Session management:
+ *   Create: implicit (Codex assigns thread_id on first turn)
+ *   Resume: `codex exec resume <thread_id>` (subcommand, not flag)
+ *
+ * Model decomposition:
+ *   Composite IDs like 'gpt-5.3-codex-high' are split into:
+ *     -m gpt-5.3-codex -c reasoning.effort=high
+ *   Standalone models (in STANDALONE_MODELS) pass through directly.
+ *
+ * Working directory:
+ *   -C <path> on first turn only. Omitted on resume (session has its own cwd).
+ */
+
+/** Known effort levels for composite model ID decomposition. */
+const EFFORT_LEVELS = new Set(['medium', 'high', 'xhigh']);
+
+/** Models that pass directly without effort decomposition. */
+const STANDALONE_MODELS = new Set(['gpt-5.3-codex-spark']);
+
+export const codexConfig: HarnessConfig = {
+  binary: 'codex',
+  baseCmd: ['exec'],
+  // --skip-git-repo-check: skip git repo validation (needed for worktrees
+  // where .git is a file, not a directory). Safe to include always.
+  bypassFlags: ['--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check'],
+  modelFlag: '-m',
+  promptVia: 'cli-sep',
+  promptSep: '--',
+  stdin: 'close',
+  cwdFlag: '-C',
+
+  // Resume changes the subcommand: 'exec resume <id>' instead of 'exec ...'
+  // These args are inserted right after baseCmd in the build function.
+  sessionResumeFlags: (id) => ['resume', id],
+
+  decomposeModel: (modelId) => {
+    // Standalone models — pass directly, no effort decomposition
+    if (STANDALONE_MODELS.has(modelId)) {
+      return ['-m', modelId];
+    }
+
+    // Decompose composite ID: "gpt-5.3-codex-high" → model + effort
+    for (const effort of EFFORT_LEVELS) {
+      if (modelId.endsWith(`-${effort}`)) {
+        const model = modelId.slice(0, -(effort.length + 1));
+        return ['-m', model, '-c', `reasoning.effort=${effort}`];
+      }
+    }
+
+    // No known effort suffix — pass as-is
+    return ['-m', modelId];
+  },
+
+  // Standalone reasoning parameter (oompa passes reasoning separately).
+  // Skipped if decomposeModel already extracted effort from composite ID.
+  reasoningFlags: (level) => ['-c', `reasoning.effort=${level}`],
+};
