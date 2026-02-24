@@ -16,9 +16,11 @@ describe('claude', () => {
       prompt: 'hello',
       sessionId: 'abc-123',
     });
+    // Prompt NOT in argv because stdin is 'prompt'
     assert.deepStrictEqual(spec.argv, [
-      'claude', '--model', 'opus', '--session-id', 'abc-123', '-p', 'hello',
+      'claude', '--model', 'opus', '--session-id', 'abc-123'
     ]);
+    assert.strictEqual(spec.prompt, 'hello');
     assert.strictEqual(spec.stdin, 'prompt');
   });
 
@@ -36,9 +38,11 @@ describe('claude', () => {
       !spec.argv.includes('--session-id'),
       `--session-id must NOT appear in resume command. Got: ${JSON.stringify(spec.argv)}`
     );
+    // Prompt NOT in argv because stdin is 'prompt'
     assert.deepStrictEqual(spec.argv, [
-      'claude', '--resume', 'abc-123', '--model', 'opus', '-p', 'continue',
+      'claude', '--resume', 'abc-123', '--model', 'opus'
     ]);
+    assert.strictEqual(spec.prompt, 'continue');
   });
 
   it('includes bypass flags when requested', () => {
@@ -247,7 +251,9 @@ describe('oompa patterns', () => {
     });
     assert.ok(spec.argv.includes('--dangerously-skip-permissions'));
     assert.ok(spec.argv.includes('--session-id'));
-    assert.ok(spec.argv.includes('-p'));
+    // Prompt NOT in argv because stdin is 'prompt'
+    assert.ok(!spec.argv.includes('-p'));
+    assert.strictEqual(spec.prompt, '[oompa:swarm-1:w0] implement task 001');
     assert.strictEqual(spec.stdin, 'prompt');
   });
 
@@ -262,6 +268,8 @@ describe('oompa patterns', () => {
     assert.ok(!spec.argv.includes('--session-id'), 'must not combine --session-id with resume');
     assert.ok(spec.argv.includes('--resume'));
     assert.ok(spec.argv.includes('abc-123'));
+    // Prompt NOT in argv
+    assert.ok(!spec.argv.includes('-p'));
   });
 
   it('reviewer: single-shot, no session, no bypass', () => {
@@ -272,7 +280,9 @@ describe('oompa patterns', () => {
     assert.ok(!spec.argv.includes('--session-id'));
     assert.ok(!spec.argv.includes('--resume'));
     assert.ok(!spec.argv.includes('--dangerously-skip-permissions'));
-    assert.deepStrictEqual(spec.argv, ['claude', '--model', 'opus', '-p', spec.prompt!]);
+    // Prompt NOT in argv
+    assert.deepStrictEqual(spec.argv, ['claude', '--model', 'opus']);
+    assert.strictEqual(spec.prompt, '[oompa:swarm-1:w0] VERDICT review prompt...');
   });
 
   it('planner: single-shot with bypass', () => {
