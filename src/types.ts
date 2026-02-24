@@ -38,9 +38,16 @@ export type StdinBehavior = 'close' | 'prompt' | 'pipe';
 /**
  * What the caller should expect from process stdout.
  *
- * jsonl:    Stream of JSON lines (claude, codex, opencode)
- * text:     Plain text output (gemini, single-shot mode)
- * ignore:   Output is irrelevant or handled out-of-band (file poller)
+ * NOTE ON MOTIVATION: Even when CLI agents self-persist to disk (like Gemini or Codex),
+ * they typically only write the session file at the very end of a turn.
+ * Progressive stdout streaming (jsonl) is mandatory for real-time UI interactivity
+ * (the "typewriter" effect) to prevent the UI from appearing frozen during long
+ * generation tasks. Disk should be treated as a persistence/rehydration layer,
+ * while stdout is the live interaction layer.
+ *
+ * jsonl:    Stream of JSON lines (claude, codex, opencode, gemini)
+ * text:     Plain text output (single-shot mode)
+ * ignore:   Output is irrelevant or handled out-of-band
  */
 export type StdoutBehavior = 'jsonl' | 'text' | 'ignore';
 
