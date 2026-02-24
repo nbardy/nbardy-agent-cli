@@ -88,7 +88,10 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
   }
 
   // Prompt delivery
-  if (options.prompt) {
+  //
+  // If the harness expects the prompt via stdin, we do NOT append it to argv.
+  // The caller is responsible for writing spec.prompt to stdin after spawn.
+  if (options.prompt && config.stdin !== 'prompt') {
     switch (config.promptVia) {
       case 'flag':
         argv.push(config.promptFlag!, options.prompt);
