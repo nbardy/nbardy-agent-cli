@@ -29,7 +29,21 @@ export type {
 } from './types';
 
 export { buildCommand } from './build';
-export { runCommand } from './run';
-export type { RunOptions, RunResult } from './run';
+export { runCommand, executeCommand, executeTurn } from './run';
+export type {
+  RunOptions,
+  RunResult,
+  UnifiedAgentEvent,
+  ExecuteCommandRequest,
+  ExecuteCommandCompletion,
+  ExecuteCommandHandle,
+  ExecuteTurnRequest,
+  ExecuteTurnEvent,
+  ExecuteTurnCompletion,
+  ExecuteTurnHandle,
+  CodexReasoningLevel,
+  TurnMode,
+  CompletionReason,
+} from './run';
 export { getHarness, listHarnesses, registry } from './harnesses';
 export { resolveBinary } from './resolve';

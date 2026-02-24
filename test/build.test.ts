@@ -79,6 +79,7 @@ describe('codex', () => {
       'codex', 'exec',
       '-C', '/tmp/work',
       '-m', 'gpt-5.3-codex', '-c', 'reasoning.effort=high',
+      '--skip-git-repo-check',
       '--', 'hello',
     ]);
     assert.strictEqual(spec.stdin, 'close');

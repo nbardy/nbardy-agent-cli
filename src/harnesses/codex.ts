@@ -27,7 +27,9 @@ export const codexConfig: HarnessConfig = {
   baseCmd: ['exec'],
   // --skip-git-repo-check: skip git repo validation (needed for worktrees
   // where .git is a file, not a directory). Safe to include always.
-  bypassFlags: ['--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check'],
+  extraArgs: ['--skip-git-repo-check'],
+  // --dangerously-bypass-approvals-and-sandbox: skip all confirmations.
+  bypassFlags: ['--dangerously-bypass-approvals-and-sandbox'],
   modelFlag: '-m',
   promptVia: 'cli-sep',
   promptSep: '--',
