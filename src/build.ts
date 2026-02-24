@@ -102,6 +102,11 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
     }
   }
 
+  // Extra args from harness config
+  if (config.extraArgs && config.extraArgs.length > 0) {
+    argv.push(...config.extraArgs);
+  }
+
   // Extra args from caller (project-specific flags)
   if (options.extraArgs && options.extraArgs.length > 0) {
     argv.push(...options.extraArgs);
@@ -110,6 +115,7 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
   return {
     argv,
     stdin: config.stdin,
+    stdout: config.stdout,
     prompt: options.prompt,
   };
 }

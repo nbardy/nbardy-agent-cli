@@ -21,6 +21,7 @@ export const claudeConfig: HarnessConfig = {
   promptVia: 'flag',
   promptFlag: '-p',
   stdin: 'prompt',
+  stdout: 'jsonl',
   sessionCreateFlags: (id) => ['--session-id', id],
   sessionResumeFlags: (id) => ['--resume', id],
 };

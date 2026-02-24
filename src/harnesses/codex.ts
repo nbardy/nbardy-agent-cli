@@ -32,6 +32,7 @@ export const codexConfig: HarnessConfig = {
   promptVia: 'cli-sep',
   promptSep: '--',
   stdin: 'close',
+  stdout: 'jsonl',
   cwdFlag: '-C',
 
   // Resume changes the subcommand: 'exec resume <id>' instead of 'exec ...'

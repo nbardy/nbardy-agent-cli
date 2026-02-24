@@ -25,6 +25,7 @@ export type {
   CommandSpec,
   PromptDelivery,
   StdinBehavior,
+  StdoutBehavior,
 } from './types';
 
 export { buildCommand } from './build';

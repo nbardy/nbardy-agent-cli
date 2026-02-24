@@ -18,6 +18,7 @@ export const opencodeConfig: HarnessConfig = {
   modelFlag: '-m',
   promptVia: 'cli-arg',
   stdin: 'close',
+  stdout: 'jsonl',
 
   // Only resume if the session ID has the expected ses_ prefix
   sessionResumeFlags: (id) =>

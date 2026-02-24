@@ -18,6 +18,8 @@ export const geminiConfig: HarnessConfig = {
   promptVia: 'flag',
   promptFlag: '-p',
   stdin: 'close',
+  stdout: 'jsonl',
+  extraArgs: ['--output-format', 'stream-json'],
 
   // Gemini resumes by CWD, not by session ID. --resume latest picks up
   // the most recent session in the current directory.

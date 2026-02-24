@@ -35,6 +35,15 @@ export type PromptDelivery = 'flag' | 'cli-arg' | 'cli-sep';
  */
 export type StdinBehavior = 'close' | 'prompt' | 'pipe';
 
+/**
+ * What the caller should expect from process stdout.
+ *
+ * jsonl:    Stream of JSON lines (claude, codex, opencode)
+ * text:     Plain text output (gemini, single-shot mode)
+ * ignore:   Output is irrelevant or handled out-of-band (file poller)
+ */
+export type StdoutBehavior = 'jsonl' | 'text' | 'ignore';
+
 // =============================================================================
 // Harness config — pure data describing CLI syntax
 // =============================================================================
@@ -71,6 +80,12 @@ export interface HarnessConfig {
 
   /** What the caller should do with process stdin */
   readonly stdin: StdinBehavior;
+
+  /** What the caller should expect from process stdout */
+  readonly stdout: StdoutBehavior;
+
+  /** Extra args appended to all commands (e.g. ['--output-format', 'stream-json']) */
+  readonly extraArgs?: readonly string[];
 
   /** CLI flag for working directory (undefined = use process cwd option) */
   readonly cwdFlag?: string;
@@ -162,6 +177,9 @@ export interface CommandSpec {
 
   /** What the caller should do with process stdin */
   stdin: StdinBehavior;
+
+  /** What the caller should expect from process stdout */
+  stdout: StdoutBehavior;
 
   /** The prompt text (for stdin delivery or caller reference) */
   prompt?: string;
