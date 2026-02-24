@@ -87,6 +87,16 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
     argv.push(...config.sessionCreateFlags(options.sessionId));
   }
 
+  // Extra args from harness config
+  if (config.extraArgs && config.extraArgs.length > 0) {
+    argv.push(...config.extraArgs);
+  }
+
+  // Extra args from caller (project-specific flags)
+  if (options.extraArgs && options.extraArgs.length > 0) {
+    argv.push(...options.extraArgs);
+  }
+
   // Prompt delivery
   //
   // If the harness expects the prompt via stdin, we do NOT append it to argv.
@@ -103,16 +113,6 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
         argv.push(config.promptSep!, options.prompt);
         break;
     }
-  }
-
-  // Extra args from harness config
-  if (config.extraArgs && config.extraArgs.length > 0) {
-    argv.push(...config.extraArgs);
-  }
-
-  // Extra args from caller (project-specific flags)
-  if (options.extraArgs && options.extraArgs.length > 0) {
-    argv.push(...options.extraArgs);
   }
 
   return {
