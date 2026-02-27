@@ -236,6 +236,30 @@ describe('gemini', () => {
     });
     assert.ok(spec.argv.includes('--yolo'));
   });
+
+  it('accepts arbitrary numbered aliases like gemini11', () => {
+    const spec = buildCommand('gemini11', {
+      model: 'gemini-2.5-pro',
+      prompt: 'hello',
+      sessionId: 'alias-session',
+    });
+    assert.deepStrictEqual(spec.argv, [
+      'gemini11', '-m', 'gemini-2.5-pro', '-p', 'hello',
+    ]);
+    assert.strictEqual(spec.stdin, 'close');
+  });
+
+  it('accepts large numbered aliases like gemini99 and preserves resume target', () => {
+    const spec = buildCommand('gemini99', {
+      model: 'gemini-2.5-flash',
+      prompt: 'continue',
+      sessionId: 'sess-99',
+      resume: true,
+    });
+    assert.strictEqual(spec.argv[0], 'gemini99');
+    assert.ok(spec.argv.includes('--resume'));
+    assert.ok(spec.argv.includes('sess-99'));
+  });
 });
 
 // =============================================================================
@@ -656,6 +680,18 @@ describe('json input', () => {
     ).trim();
     const spec = JSON.parse(output);
     assert.deepStrictEqual(spec.argv, ['gemini', '-m', 'gemini-2.5-pro', '-p', 'hello']);
+  });
+
+  it('inline JSON alias harness works for gemini11', () => {
+    const json = '{"harness":"gemini11","model":"gemini-2.5-pro","prompt":"hello"}';
+    const output = execSync(
+      `node dist/src/cli.js build --input '${json}'`,
+      { encoding: 'utf-8', cwd: process.cwd() }
+    ).trim();
+    const spec = JSON.parse(output);
+    assert.strictEqual(spec.argv[0], 'gemini11');
+    assert.ok(spec.argv.includes('-m'));
+    assert.ok(spec.argv.includes('gemini-2.5-pro'));
   });
 });
 
