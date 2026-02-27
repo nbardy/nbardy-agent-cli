@@ -4,8 +4,10 @@ import type { HarnessConfig } from '../types';
  * Gemini CLI harness config.
  *
  * Session management:
- *   Implicit — Gemini manages sessions by working directory.
- *   Resume: --resume latest (always, regardless of session ID)
+ *   Gemini supports UUID-based resume: --resume <session-uuid>.
+ *   Using the actual session ID avoids collisions when multiple
+ *   conversations share the same working directory (--resume latest
+ *   would always resume the most recent one, causing fights).
  *
  * Permissions:
  *   --yolo bypasses all confirmation prompts.
@@ -20,7 +22,8 @@ export const geminiConfig: HarnessConfig = {
   stdin: 'close',
   stdout: 'jsonl',
 
-  // Gemini resumes by CWD, not by session ID. --resume latest picks up
-  // the most recent session in the current directory.
-  sessionResumeFlags: (_id) => ['--resume', 'latest'],
+  // Gemini accepts UUIDs for --resume (not just "latest").
+  // Using the actual session ID prevents two conversations with the
+  // same CWD from fighting over a single session.
+  sessionResumeFlags: (id) => ['--resume', id],
 };
