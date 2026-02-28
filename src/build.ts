@@ -62,7 +62,7 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
   // Model flags
   //
   // decomposeModel may already handle reasoning (e.g. codex composite IDs
-  // like 'gpt-5.3-codex-high' decompose into -m + -c reasoning.effort=high).
+  // like 'gpt-5.3-codex-high' decompose into -m + -c model_reasoning_effort=high).
   // Track whether decomposition produced effort flags so we don't double-add.
   let modelHandledReasoning = false;
   if (options.model) {
@@ -70,7 +70,7 @@ function buildFromConfig(config: HarnessConfig, options: BuildOptions): CommandS
       const flags = config.decomposeModel(options.model);
       argv.push(...flags);
       // If decomposition produced -c flags, reasoning is already handled
-      modelHandledReasoning = flags.some(f => f.startsWith('reasoning.effort='));
+      modelHandledReasoning = flags.some(f => f.startsWith('model_reasoning_effort='));
     } else {
       argv.push(config.modelFlag, options.model);
     }

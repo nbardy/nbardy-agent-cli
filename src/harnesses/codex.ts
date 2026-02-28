@@ -9,7 +9,7 @@ import type { HarnessConfig } from '../types';
  *
  * Model decomposition:
  *   Composite IDs like 'gpt-5.3-codex-high' are split into:
- *     -m gpt-5.3-codex -c reasoning.effort=high
+ *     -m gpt-5.3-codex -c model_reasoning_effort=high
  *   Standalone models (in STANDALONE_MODELS) pass through directly.
  *
  * Working directory:
@@ -51,7 +51,7 @@ export const codexConfig: HarnessConfig = {
     for (const effort of EFFORT_LEVELS) {
       if (modelId.endsWith(`-${effort}`)) {
         const model = modelId.slice(0, -(effort.length + 1));
-        return ['-m', model, '-c', `reasoning.effort=${effort}`];
+        return ['-m', model, '-c', `model_reasoning_effort=${effort}`];
       }
     }
 
@@ -61,5 +61,5 @@ export const codexConfig: HarnessConfig = {
 
   // Standalone reasoning parameter (oompa passes reasoning separately).
   // Skipped if decomposeModel already extracted effort from composite ID.
-  reasoningFlags: (level) => ['-c', `reasoning.effort=${level}`],
+  reasoningFlags: (level) => ['-c', `model_reasoning_effort=${level}`],
 };

@@ -26,6 +26,13 @@ if (prompt === 'contract-no-complete') {
   process.exit(7);
 }
 
+if (prompt === 'contract-missing-terminal-success-exit') {
+  emit({ type: 'thread.started', thread_id: 'thread-missing-terminal' });
+  emit({ type: 'turn.started' });
+  emit({ type: 'item.completed', item: { type: 'agent_message', text: 'partial' } });
+  process.exit(0);
+}
+
 if (prompt === 'flag-check') {
   emit({ type: 'thread.started', thread_id: 'thread-resume' });
   process.exit(0);
@@ -128,6 +135,40 @@ describe('executeCommand contract', { concurrency: 1 }, () => {
       .filter((event): event is Extract<UnifiedAgentEvent, { type: 'turn.complete' }> => event.type === 'turn.complete')
       .map((event) => event.reason);
     assert.deepStrictEqual(completionReasons, ['error']);
+  });
+
+  it('treats conversation exit without turn.complete as error even with exit code 0', async () => {
+    const turn = executeCommand({
+      harness: 'codex',
+      mode: 'conversation',
+      prompt: 'contract-missing-terminal-success-exit',
+      cwd: workspace,
+      model: 'gpt-5.3-codex',
+      yolo: false,
+    });
+
+    const eventsPromise = collectEvents(turn.events);
+    const completion = await turn.completed;
+    const events = await eventsPromise;
+    const resolvedSessionId = await turn.sessionId;
+
+    assert.strictEqual(completion.reason, 'error');
+    assert.strictEqual(completion.exitCode, 0);
+    assert.strictEqual(completion.sessionId, 'thread-missing-terminal');
+    assert.strictEqual(resolvedSessionId, 'thread-missing-terminal');
+
+    const completionReasons = events
+      .filter((event): event is Extract<UnifiedAgentEvent, { type: 'turn.complete' }> => event.type === 'turn.complete')
+      .map((event) => event.reason);
+    assert.deepStrictEqual(completionReasons, ['error']);
+
+    const errors = events
+      .filter((event): event is Extract<UnifiedAgentEvent, { type: 'error' }> => event.type === 'error')
+      .map((event) => event.message);
+    assert.ok(
+      errors.some((message) => message.includes('without a terminal turn.complete event')),
+      `expected missing-terminal error message; got: ${JSON.stringify(errors)}`
+    );
   });
 
   it('uses --full-auto for codex resume without adding dangerous bypass flag', async () => {

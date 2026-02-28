@@ -747,12 +747,21 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
 
       let finalReason = completionReason;
       if (!completeEventSeen) {
-        finalReason =
-          stopRequested || exitCode === null
-            ? 'killed'
-            : completionReason === 'success' && exitCode !== 0
-              ? 'error'
-              : completionReason;
+        if (stopRequested || exitCode === null) {
+          finalReason = 'killed';
+        } else if (completionReason !== 'success') {
+          finalReason = completionReason;
+        } else if (request.mode === 'conversation') {
+          // Conversation mode must end on an explicit terminal event from the harness.
+          // Treat a silent process exit as an error to avoid false "success" turns.
+          finalReason = 'error';
+          emit({
+            type: 'error',
+            message: `${request.harness} exited without a terminal turn.complete event`,
+          });
+        } else {
+          finalReason = exitCode === 0 ? 'success' : 'error';
+        }
         emit({ type: 'turn.complete', reason: finalReason });
       }
 

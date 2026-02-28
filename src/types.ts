@@ -112,14 +112,14 @@ export interface HarnessConfig {
    * When provided, replaces the default `[modelFlag, modelId]` behavior.
    *
    * Used for:
-   * - Codex composite IDs: 'gpt-5.3-codex-high' → ['-m', 'gpt-5.3-codex', '-c', 'reasoning.effort=high']
+   * - Codex composite IDs: 'gpt-5.3-codex-high' → ['-m', 'gpt-5.3-codex', '-c', 'model_reasoning_effort=high']
    * - OpenCode legacy format: 'openai/foo' → ['-m', 'opencode/foo']
    */
   readonly decomposeModel?: (modelId: string) => readonly string[];
 
   /**
    * Reasoning/effort flags. Called when BuildOptions.reasoning is set.
-   * Only codex uses this (for `-c reasoning.effort=X`).
+   * Only codex uses this (for `-c model_reasoning_effort=X`).
    * Returns flags to append, or empty array if not supported.
    *
    * This is separate from decomposeModel because oompa passes reasoning
@@ -156,7 +156,7 @@ export interface BuildOptions {
 
   /**
    * Reasoning/effort level (codex only).
-   * Adds `-c reasoning.effort=X` to the command.
+   * Adds `-c model_reasoning_effort=X` to the command.
    *
    * Two ways to specify effort for codex:
    * 1. Composite model ID: model='gpt-5.3-codex-high' (decomposeModel handles it)
