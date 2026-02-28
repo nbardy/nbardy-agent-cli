@@ -1,6 +1,6 @@
 {
   "name": "@nbardy/agent-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared CLI agent invocation tool — single source of truth for invoking Claude, Codex, OpenCode, Gemini CLIs",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
