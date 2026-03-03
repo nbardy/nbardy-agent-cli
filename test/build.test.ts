@@ -78,7 +78,7 @@ describe('codex', () => {
     assert.deepStrictEqual(spec.argv, [
       'codex', 'exec',
       '-C', '/tmp/work',
-      '-m', 'gpt-5.3-codex', '-c', 'reasoning.effort=high',
+      '-m', 'gpt-5.3-codex', '-c', 'model_reasoning_effort=high',
       '--skip-git-repo-check',
       '--', 'hello',
     ]);
@@ -119,7 +119,7 @@ describe('codex', () => {
     assert.notStrictEqual(mIdx, -1);
     assert.strictEqual(spec.argv[mIdx + 1], 'gpt-5.3-codex');
     assert.ok(spec.argv.includes('-c'));
-    assert.ok(spec.argv.includes('reasoning.effort=high'));
+    assert.ok(spec.argv.includes('model_reasoning_effort=high'));
   });
 
   it('passes standalone models directly (no decomposition)', () => {
@@ -132,7 +132,7 @@ describe('codex', () => {
   it('decomposes medium and xhigh effort levels', () => {
     for (const effort of ['medium', 'xhigh']) {
       const spec = buildCommand('codex', { model: `gpt-5.3-codex-${effort}`, prompt: 'test' });
-      assert.ok(spec.argv.includes(`reasoning.effort=${effort}`), `missing effort for ${effort}`);
+      assert.ok(spec.argv.includes(`model_reasoning_effort=${effort}`), `missing effort for ${effort}`);
     }
   });
 
@@ -217,16 +217,15 @@ describe('gemini', () => {
     assert.strictEqual(spec.stdin, 'close');
   });
 
-  it('resume uses --resume latest regardless of sessionId', () => {
+  it('resume uses --resume with the provided sessionId', () => {
     const spec = buildCommand('gemini', {
       model: 'gemini-2.5-pro',
       prompt: 'continue',
-      sessionId: 'ignored-id',
+      sessionId: 'my-session',
       resume: true,
     });
     assert.ok(spec.argv.includes('--resume'));
-    assert.ok(spec.argv.includes('latest'));
-    assert.ok(!spec.argv.includes('ignored-id'));
+    assert.ok(spec.argv.includes('my-session'));
   });
 
   it('includes --yolo when bypass requested', () => {
@@ -479,7 +478,7 @@ describe('reasoning', () => {
       reasoning: 'high',
     });
     assert.ok(spec.argv.includes('-c'));
-    assert.ok(spec.argv.includes('reasoning.effort=high'));
+    assert.ok(spec.argv.includes('model_reasoning_effort=high'));
   });
 
   it('does NOT double-add reasoning when composite ID already encodes it', () => {
@@ -488,7 +487,7 @@ describe('reasoning', () => {
       prompt: 'test',
       reasoning: 'high',  // should be ignored — model ID already has effort
     });
-    const cFlags = spec.argv.filter(f => f.startsWith('reasoning.effort='));
+    const cFlags = spec.argv.filter(f => f.startsWith('model_reasoning_effort='));
     assert.strictEqual(cFlags.length, 1, `expected 1 reasoning flag, got ${cFlags.length}: ${JSON.stringify(spec.argv)}`);
   });
 
@@ -499,7 +498,7 @@ describe('reasoning', () => {
         prompt: 'test',
         reasoning: level,
       });
-      assert.ok(spec.argv.includes(`reasoning.effort=${level}`), `missing effort for ${level}`);
+      assert.ok(spec.argv.includes(`model_reasoning_effort=${level}`), `missing effort for ${level}`);
     }
   });
 
@@ -590,8 +589,8 @@ describe('model loop', () => {
           reasoning,
         });
         assert.ok(
-          spec.argv.includes(`reasoning.effort=${reasoning}`),
-          `missing reasoning.effort=${reasoning} for ${model}: ${JSON.stringify(spec.argv)}`
+          spec.argv.includes(`model_reasoning_effort=${reasoning}`),
+          `missing model_reasoning_effort=${reasoning} for ${model}: ${JSON.stringify(spec.argv)}`
         );
       });
     }
@@ -668,7 +667,7 @@ describe('json input', () => {
     const spec = JSON.parse(output);
     assert.ok(spec.argv.includes('-m'));
     assert.ok(spec.argv.includes('gpt-5.3-codex'));
-    assert.ok(spec.argv.includes('reasoning.effort=high'));
+    assert.ok(spec.argv.includes('model_reasoning_effort=high'));
     assert.ok(spec.argv.includes('--dangerously-bypass-approvals-and-sandbox'));
   });
 
