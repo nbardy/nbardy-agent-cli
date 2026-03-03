@@ -62,7 +62,7 @@ async function collectEvents(events: AsyncIterable<UnifiedAgentEvent>): Promise<
   return out;
 }
 
-describe('executeCommand contract', { concurrency: 1 }, () => {
+describe('executeCommand contract', { concurrency: true }, () => {
   const originalPath = process.env.PATH ?? '';
   let tempRoot = '';
   let workspace = '';
