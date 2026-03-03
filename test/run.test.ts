@@ -38,6 +38,15 @@ if (prompt === 'flag-check') {
   process.exit(0);
 }
 
+if (prompt === 'contract-stderr') {
+  emit({ type: 'thread.started', thread_id: 'thread-stderr' });
+  emit({ type: 'turn.started' });
+  process.stderr.write('stderr line one\\n');
+  emit({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } });
+  emit({ type: 'turn.completed' });
+  process.exit(0);
+}
+
 process.exit(0);
 `;
 
@@ -192,5 +201,32 @@ describe('executeCommand contract', { concurrency: 1 }, () => {
     assert.ok(!turn.spec.argv.includes('--dangerously-bypass-approvals-and-sandbox'));
 
     await turn.completed;
+  });
+
+  // Regression: run.ts had literal '\n' strings (backslash-n) instead of real newlines on the
+  // stdoutBuffer/stderrBuffer declarations and in onStderr, causing `ReferenceError: n is not
+  // defined` on every executeCommand call. This test exercises both the function body init
+  // (stdoutBuffer) and the onStderr handler (stderrBuffer accumulation).
+  it('captures stderr events without ReferenceError (regression: literal \\n corruption)', async () => {
+    const turn = executeCommand({
+      harness: 'codex',
+      mode: 'conversation',
+      prompt: 'contract-stderr',
+      cwd: workspace,
+      model: 'gpt-5.3-codex',
+      yolo: false,
+    });
+
+    const eventsPromise = collectEvents(turn.events);
+    const completion = await turn.completed;
+    const events = await eventsPromise;
+
+    assert.strictEqual(completion.reason, 'success');
+    const stderrEvents = events.filter(
+      (e): e is Extract<UnifiedAgentEvent, { type: 'stderr' }> => e.type === 'stderr'
+    );
+    assert.ok(stderrEvents.length > 0, 'expected at least one stderr event');
+    const combined = stderrEvents.map((e) => e.text).join('');
+    assert.ok(combined.includes('stderr line one'), `expected stderr text; got: ${combined}`);
   });
 });

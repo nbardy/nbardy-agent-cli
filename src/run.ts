@@ -638,6 +638,7 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
   let turnStartedSeen = false;
   let stopRequested = false;
   let stdoutBuffer = '';
+  let stderrBuffer = '';
 
   let resolveSessionId!: (value: string) => void;
   const sessionId = new Promise<string>((resolve) => {
@@ -718,6 +719,7 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
   const onStderr = (chunk: Buffer): void => {
     const text = chunk.toString();
     emit({ type: 'stderr', text });
+    stderrBuffer += text;
   };
 
   const { child, spec, done } = runCommand(request.harness, {
@@ -761,9 +763,19 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
           // Conversation mode must end on an explicit terminal event from the harness.
           // Treat a silent process exit as an error to avoid false "success" turns.
           finalReason = 'error';
+          
+          let details = '';
+          if (exitCode !== 0 && exitCode !== null) {
+            const stderrStr = stderrBuffer.trim();
+            if (stderrStr) {
+               const lines = stderrStr.split('\n');
+               details = `: ${lines[lines.length - 1]}`;
+            }
+          }
+          
           emit({
             type: 'error',
-            message: `${request.harness} exited without a terminal turn.complete event`,
+            message: `${request.harness} exited without a terminal turn.complete event${details}`,
           });
         } else {
           finalReason = exitCode === 0 ? 'success' : 'error';
