@@ -54,6 +54,32 @@ process.exit(0);
   chmodSync(shimPath, 0o755);
 }
 
+function writeGeminiShim(binDir: string): void {
+  const shimPath = path.join(binDir, 'gemini2');
+  const shimSource = `#!/usr/bin/env node
+const promptIdx = process.argv.indexOf('-p');
+const prompt = promptIdx >= 0 ? (process.argv[promptIdx + 1] ?? '') : '';
+const emit = (obj) => process.stdout.write(JSON.stringify(obj) + '\\n');
+
+if (prompt === 'gemini-auth-required') {
+  process.stdout.write('Opening authentication page in your browser. Do you want to continue? [Y/n]:');
+  process.exit(0);
+}
+
+if (prompt === 'gemini-success') {
+  emit({ type: 'init' });
+  emit({ type: 'message', role: 'assistant', content: 'hi from gemini' });
+  emit({ type: 'result', status: 'success' });
+  process.exit(0);
+}
+
+process.exit(0);
+`;
+
+  writeFileSync(shimPath, shimSource);
+  chmodSync(shimPath, 0o755);
+}
+
 async function collectEvents(events: AsyncIterable<UnifiedAgentEvent>): Promise<UnifiedAgentEvent[]> {
   const out: UnifiedAgentEvent[] = [];
   for await (const event of events) {
@@ -72,6 +98,7 @@ describe('executeCommand contract', { concurrency: true }, () => {
     workspace = path.join(tempRoot, 'workspace');
     mkdirSync(workspace, { recursive: true });
     writeCodexShim(tempRoot);
+    writeGeminiShim(tempRoot);
     process.env.PATH = `${tempRoot}:${originalPath}`;
   });
 
@@ -228,5 +255,52 @@ describe('executeCommand contract', { concurrency: true }, () => {
     assert.ok(stderrEvents.length > 0, 'expected at least one stderr event');
     const combined = stderrEvents.map((e) => e.text).join('');
     assert.ok(combined.includes('stderr line one'), `expected stderr text; got: ${combined}`);
+  });
+
+  it('preserves explicit first-turn sessionId when provided', async () => {
+    const turn = executeCommand({
+      harness: 'codex',
+      mode: 'conversation',
+      prompt: 'contract-success',
+      cwd: workspace,
+      model: 'gpt-5.3-codex',
+      sessionId: 'first-turn-session',
+      yolo: false,
+    });
+
+    const eventsPromise = collectEvents(turn.events);
+    const completion = await turn.completed;
+    const events = await eventsPromise;
+
+    const sessionEvents = events
+      .filter((event): event is Extract<UnifiedAgentEvent, { type: 'session.started' }> => event.type === 'session.started')
+      .map((event) => event.sessionId);
+
+    assert.strictEqual(sessionEvents[0], 'first-turn-session');
+    assert.strictEqual(completion.sessionId, 'thread-final');
+  });
+
+  it('supports gemini alias harnesses and fails fast on interactive auth stdout', async () => {
+    const turn = executeCommand({
+      harness: 'gemini2',
+      mode: 'conversation',
+      prompt: 'gemini-auth-required',
+      cwd: workspace,
+      model: 'gemini-3.1-pro-preview',
+      yolo: false,
+    });
+
+    const eventsPromise = collectEvents(turn.events);
+    const completion = await turn.completed;
+    const events = await eventsPromise;
+
+    assert.strictEqual(completion.reason, 'error');
+    const errors = events
+      .filter((event): event is Extract<UnifiedAgentEvent, { type: 'error' }> => event.type === 'error')
+      .map((event) => event.message);
+    assert.ok(
+      errors.some((message) => message.includes('interactive authentication')),
+      `expected auth failure message; got: ${JSON.stringify(errors)}`
+    );
   });
 });

@@ -1,4 +1,4 @@
-import type { HarnessConfig, BuildOptions, CommandSpec } from './types';
+import type { HarnessConfig, BuildOptions, CommandSpec, HarnessName } from './types';
 import { getHarness } from './harnesses';
 
 /**
@@ -13,7 +13,7 @@ import { getHarness } from './harnesses';
  * - Process lifecycle (project-specific)
  * - Streaming/format flags (caller appends via extraArgs)
  */
-export function buildCommand(harness: string, options: BuildOptions = {}): CommandSpec {
+export function buildCommand(harness: HarnessName | string, options: BuildOptions = {}): CommandSpec {
   const config = getHarness(harness);
   return buildFromConfig(config, options);
 }

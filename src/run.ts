@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { BuildOptions, CommandSpec, Harness } from './types';
+import type { BuildOptions, CommandSpec, Harness, HarnessName, GeminiAlias } from './types';
 import { buildCommand } from './build';
+import { canonicalizeHarness } from './harnesses';
 
 /**
  * Options for runCommand — extends BuildOptions with process-level settings.
@@ -29,12 +30,15 @@ export type CodexReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh
 export type TurnMode = 'conversation' | 'single-shot';
 export type CompletionReason = 'success' | 'out_of_tokens' | 'error' | 'killed';
 
-type BaseExecuteCommandRequest<THarness extends Harness> = {
+type BaseExecuteCommandRequest<THarness extends HarnessName> = {
   harness: THarness;
   mode: TurnMode;
   prompt: string;
   cwd: string;
   model?: string;
+  extraArgs?: readonly string[];
+  /** Explicit first-turn session ID to create/use when not resuming. */
+  sessionId?: string;
   /** Existing provider session ID to resume. */
   resumeSessionId?: string;
   /** True by default: run in maximum non-interactive mode where supported. */
@@ -53,7 +57,7 @@ type CodexExecuteCommandRequest = BaseExecuteCommandRequest<'codex'> & {
   fullAuto?: boolean;
 };
 
-type NonCodexExecuteCommandRequest<THarness extends Exclude<Harness, 'codex'>> =
+type NonCodexExecuteCommandRequest<THarness extends Exclude<HarnessName, 'codex'>> =
   BaseExecuteCommandRequest<THarness> & {
     reasoningEffort?: never;
     fullAuto?: never;
@@ -63,7 +67,8 @@ export type ExecuteCommandRequest =
   | CodexExecuteCommandRequest
   | NonCodexExecuteCommandRequest<'claude'>
   | NonCodexExecuteCommandRequest<'opencode'>
-  | NonCodexExecuteCommandRequest<'gemini'>;
+  | NonCodexExecuteCommandRequest<'gemini'>
+  | NonCodexExecuteCommandRequest<GeminiAlias>;
 
 export type UnifiedAgentEvent =
   | { type: 'session.started'; sessionId: string }
@@ -176,6 +181,23 @@ function asString(value: unknown): string | undefined {
 function normalizeType(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   return raw.replace(/-/g, '_').toLowerCase();
+}
+
+function looksLikeInteractiveAuthPrompt(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return normalized.includes('opening authentication page in your browser')
+    || normalized.includes('open authentication page in your browser')
+    || normalized.includes('sign in with your browser')
+    || normalized.includes('login with your browser')
+    || normalized.includes('authenticate in your browser');
+}
+
+function summarizeRawStdout(harness: string, text: string): string {
+  const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 240);
+  if (looksLikeInteractiveAuthPrompt(text)) {
+    return `AUTH_REQUIRED: ${harness} requested interactive authentication. Authenticate that harness outside oompa first. Raw stdout: ${snippet}`;
+  }
+  return `${harness} emitted non-JSON stdout in conversation mode: ${snippet}`;
 }
 
 function buildModeExtraArgs(
@@ -519,6 +541,9 @@ function parseGemini(json: unknown): UnifiedAgentEvent[] {
   if (!obj) return [{ type: 'error', message: 'Gemini emitted non-object JSON' }];
 
   const type = asString(obj.type);
+  if (!type) {
+    return [{ type: 'error', message: `Gemini JSON missing required "type": ${JSON.stringify(obj)}` }];
+  }
   if (type === 'init') return [{ type: 'turn.started' }];
 
   if (type === 'message') {
@@ -551,7 +576,7 @@ function parseGemini(json: unknown): UnifiedAgentEvent[] {
     ];
   }
 
-  return [];
+  return [{ type: 'error', message: `Gemini emitted unrecognized event type "${type}": ${JSON.stringify(obj)}` }];
 }
 
 function parseJsonEvent(harness: Harness, json: unknown): UnifiedAgentEvent[] {
@@ -628,10 +653,11 @@ export function runCommand(harness: string, options: RunOptions = {}): {
  */
 export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHandle {
   const queue = createAsyncQueue<UnifiedAgentEvent>();
+  const canonicalHarness = canonicalizeHarness(request.harness);
   const yolo = request.yolo !== false;
-  const codexFullAuto = request.harness === 'codex' && request.fullAuto === true;
-  const bypassPermissions = yolo && !(request.harness === 'codex' && codexFullAuto);
-  const initialSessionId = request.resumeSessionId ?? randomUUID();
+  const codexFullAuto = canonicalHarness === 'codex' && request.fullAuto === true;
+  const bypassPermissions = yolo && !(canonicalHarness === 'codex' && codexFullAuto);
+  const initialSessionId = request.resumeSessionId ?? request.sessionId ?? randomUUID();
   let resolvedSessionId = initialSessionId;
   let completionReason: CompletionReason = 'success';
   let completeEventSeen = false;
@@ -652,9 +678,12 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
     resume: !!request.resumeSessionId,
     cwd: request.cwd,
     bypassPermissions,
-    extraArgs: buildModeExtraArgs(request.harness, request.mode, yolo, request.cwd, codexFullAuto),
+    extraArgs: [
+      ...buildModeExtraArgs(canonicalHarness, request.mode, yolo, request.cwd, codexFullAuto),
+      ...(request.extraArgs ?? []),
+    ],
   };
-  if (request.harness === 'codex' && request.reasoningEffort) {
+  if (canonicalHarness === 'codex' && request.reasoningEffort) {
     buildOptions.reasoning = request.reasoningEffort;
   }
 
@@ -675,7 +704,7 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
   };
 
   const maybeUpdateSession = (json: unknown): void => {
-    const captured = captureSessionIdFromJson(request.harness, json);
+    const captured = captureSessionIdFromJson(canonicalHarness, json);
     if (captured && captured !== resolvedSessionId) {
       resolvedSessionId = captured;
       emit({ type: 'session.started', sessionId: captured });
@@ -704,13 +733,13 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
       } catch (err) {
         emit({
           type: 'error',
-          message: `Failed to parse ${request.harness} JSON: ${err instanceof Error ? err.message : String(err)}`,
+          message: summarizeRawStdout(request.harness, trimmed),
         });
         continue;
       }
 
       maybeUpdateSession(json);
-      for (const event of parseJsonEvent(request.harness, json)) {
+      for (const event of parseJsonEvent(canonicalHarness, json)) {
         emit(event);
       }
     }
@@ -744,11 +773,14 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
           try {
             const json = JSON.parse(trailing) as unknown;
             maybeUpdateSession(json);
-            for (const event of parseJsonEvent(request.harness, json)) {
+            for (const event of parseJsonEvent(canonicalHarness, json)) {
               emit(event);
             }
           } catch {
-            // Ignore trailing partial JSON on close.
+            emit({
+              type: 'error',
+              message: summarizeRawStdout(request.harness, trailing),
+            });
           }
         }
       }

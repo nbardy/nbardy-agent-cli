@@ -1,4 +1,4 @@
-import type { Harness, HarnessConfig } from '../types';
+import type { Harness, HarnessConfig, HarnessName } from '../types';
 import { claudeConfig } from './claude';
 import { codexConfig } from './codex';
 import { opencodeConfig } from './opencode';
@@ -14,12 +14,16 @@ export const registry: Record<Harness, HarnessConfig> = {
   gemini: geminiConfig,
 };
 
-function canonicalizeHarness(name: string): string {
-  return geminiAliasPattern.test(name) ? 'gemini' : name;
+export function isGeminiAlias(name: string): name is Extract<HarnessName, `gemini${number}`> {
+  return geminiAliasPattern.test(name);
+}
+
+export function canonicalizeHarness(name: HarnessName | string): Harness {
+  return isGeminiAlias(name) ? 'gemini' : name as Harness;
 }
 
 /** Get a harness config by name. Throws on unknown harness. */
-export function getHarness(name: string): HarnessConfig {
+export function getHarness(name: HarnessName | string): HarnessConfig {
   const canonical = canonicalizeHarness(name);
   const config = registry[canonical as Harness];
   if (!config) {

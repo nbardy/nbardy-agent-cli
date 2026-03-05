@@ -20,6 +20,8 @@
 
 export type {
   Harness,
+  HarnessName,
+  GeminiAlias,
   HarnessConfig,
   BuildOptions,
   CommandSpec,

@@ -12,6 +12,8 @@
 
 /** Adding a harness = adding one entry here + one config in harnesses/ */
 export type Harness = 'claude' | 'codex' | 'opencode' | 'gemini';
+export type GeminiAlias = `gemini${number}`;
+export type HarnessName = Harness | GeminiAlias;
 
 // =============================================================================
 // Prompt & stdin behavior

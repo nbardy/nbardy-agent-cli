@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
 import { buildCommand } from './build';
-import { listHarnesses, getHarness } from './harnesses';
+import { executeCommand, type ExecuteCommandRequest, type CodexReasoningLevel } from './run';
+import { listHarnesses, getHarness, canonicalizeHarness } from './harnesses';
 import { resolveBinary } from './resolve';
-import type { BuildOptions } from './types';
+import type { BuildOptions, HarnessName } from './types';
 
 const USAGE = `agent-cli — Shared CLI agent invocation tool
 
@@ -120,7 +120,63 @@ function parseBuildOptions(rest: string[]): { harness: string; options: BuildOpt
   };
 }
 
-function main(): void {
+function parseRunRequest(rest: string[]): ExecuteCommandRequest {
+  const opts = parseArgs(rest);
+
+  if (opts.input !== undefined) {
+    const raw = opts.input === '-'
+      ? readFileSync(0, 'utf-8')
+      : opts.input as string;
+    return JSON.parse(raw) as ExecuteCommandRequest;
+  }
+
+  const harness = opts.harness as string | undefined;
+  if (!harness) {
+    console.error('Error: --harness is required (or use --input for JSON mode)\n');
+    console.error(USAGE);
+    process.exit(1);
+  }
+
+  const harnessName = harness as HarnessName;
+  const base = {
+    harness: harnessName,
+    mode: 'conversation' as const,
+    prompt: (opts.prompt as string | undefined) ?? '',
+    cwd: (opts.cwd as string | undefined) ?? process.cwd(),
+    model: opts.model as string | undefined,
+    extraArgs: opts.extra as string[] | undefined,
+    yolo: opts['bypass-permissions'] === true,
+    ...(opts.session ? { sessionId: opts.session as string } : {}),
+    ...(opts.resume && opts.session ? { resumeSessionId: opts.session as string } : {}),
+  };
+
+  if (canonicalizeHarness(harnessName) === 'codex') {
+    return {
+      ...base,
+      harness: 'codex',
+      ...(opts.reasoning ? { reasoningEffort: opts.reasoning as CodexReasoningLevel } : {}),
+    };
+  }
+
+  return base as ExecuteCommandRequest;
+}
+
+function exitCodeForReason(reason: string, childExitCode: number | null): number {
+  switch (reason) {
+    case 'success':
+      return childExitCode ?? 0;
+    case 'out_of_tokens':
+      return 2;
+    case 'error':
+      return 3;
+    case 'killed':
+      return 130;
+    default:
+      return childExitCode ?? 1;
+  }
+}
+
+async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
 
   if (!command || command === '--help' || command === '-h') {
@@ -130,37 +186,14 @@ function main(): void {
 
   switch (command) {
     case 'run': {
-      const { harness, options } = parseBuildOptions(rest);
-      const spec = buildCommand(harness, options);
-      const [bin, ...args] = spec.argv;
-
-      const child = spawn(bin, args, {
-        cwd: options.cwd,
-        stdio: [
-          'pipe',      // stdin: we control it
-          'inherit',   // stdout: pass through to caller
-          'inherit',   // stderr: pass through to caller
-        ],
-      });
-
-      // Deliver prompt via stdin based on harness config
-      if (child.stdin) {
-        if (spec.stdin === 'prompt' && spec.prompt) {
-          child.stdin.write(spec.prompt);
-        }
-        if (spec.stdin !== 'pipe') {
-          child.stdin.end();
-        }
+      const request = parseRunRequest(rest);
+      const handle = executeCommand(request);
+      for await (const event of handle.events) {
+        process.stdout.write(`${JSON.stringify(event)}\n`);
       }
 
-      child.on('close', (code) => {
-        process.exit(code ?? 1);
-      });
-
-      child.on('error', (err) => {
-        console.error(`Failed to spawn ${bin}: ${err.message}`);
-        process.exit(127);
-      });
+      const completion = await handle.completed;
+      process.exit(exitCodeForReason(completion.reason, completion.exitCode));
       break;
     }
 
@@ -225,4 +258,7 @@ function main(): void {
   }
 }
 
-main();
+main().catch((err) => {
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});
