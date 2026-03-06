@@ -68,6 +68,7 @@ if (prompt === 'gemini-auth-required') {
 
 if (prompt === 'gemini-success') {
   emit({ type: 'init' });
+  emit({ type: 'tool_result', status: 'success', output: 'ls output' });
   emit({ type: 'message', role: 'assistant', content: 'hi from gemini' });
   emit({ type: 'result', status: 'success' });
   process.exit(0);
@@ -302,5 +303,33 @@ describe('executeCommand contract', { concurrency: true }, () => {
       errors.some((message) => message.includes('interactive authentication')),
       `expected auth failure message; got: ${JSON.stringify(errors)}`
     );
+  });
+
+  it('does not invent a fake session id for first-turn gemini runs', async () => {
+    const turn = executeCommand({
+      harness: 'gemini2',
+      mode: 'conversation',
+      prompt: 'gemini-success',
+      cwd: workspace,
+      model: 'gemini-3.1-pro-preview',
+      yolo: false,
+    });
+
+    const eventsPromise = collectEvents(turn.events);
+    const completion = await turn.completed;
+    const events = await eventsPromise;
+
+    assert.strictEqual(completion.reason, 'success');
+    assert.strictEqual(completion.sessionId, '');
+
+    const sessionEvents = events.filter(
+      (event): event is Extract<UnifiedAgentEvent, { type: 'session.started' }> => event.type === 'session.started'
+    );
+    assert.strictEqual(sessionEvents.length, 0);
+
+    const errors = events.filter(
+      (event): event is Extract<UnifiedAgentEvent, { type: 'error' }> => event.type === 'error'
+    );
+    assert.strictEqual(errors.length, 0);
   });
 });

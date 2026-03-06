@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import type { BuildOptions, CommandSpec, Harness, HarnessName, GeminiAlias } from './types';
 import { buildCommand } from './build';
 import { canonicalizeHarness } from './harnesses';
@@ -559,6 +558,10 @@ function parseGemini(json: unknown): UnifiedAgentEvent[] {
     return [{ type: 'tool.use', name, input }];
   }
 
+  if (type === 'tool_result') {
+    return [];
+  }
+
   if (type === 'result') {
     if (asString(obj.status) === 'success') {
       return [{ type: 'turn.complete', reason: 'success' }];
@@ -657,8 +660,9 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
   const yolo = request.yolo !== false;
   const codexFullAuto = canonicalHarness === 'codex' && request.fullAuto === true;
   const bypassPermissions = yolo && !(canonicalHarness === 'codex' && codexFullAuto);
-  const initialSessionId = request.resumeSessionId ?? request.sessionId ?? randomUUID();
-  let resolvedSessionId = initialSessionId;
+  const requestedSessionId = request.resumeSessionId ?? request.sessionId;
+  const initialSessionId = requestedSessionId ?? null;
+  let resolvedSessionId = requestedSessionId ?? '';
   let completionReason: CompletionReason = 'success';
   let completeEventSeen = false;
   let turnStartedSeen = false;
@@ -674,7 +678,7 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
   const buildOptions: BuildOptions = {
     model: request.model,
     prompt: request.prompt,
-    sessionId: initialSessionId,
+    sessionId: initialSessionId ?? undefined,
     resume: !!request.resumeSessionId,
     cwd: request.cwd,
     bypassPermissions,
@@ -762,7 +766,9 @@ export function executeCommand(request: ExecuteCommandRequest): ExecuteCommandHa
     child.unref();
   }
 
-  emit({ type: 'session.started', sessionId: resolvedSessionId });
+  if (resolvedSessionId) {
+    emit({ type: 'session.started', sessionId: resolvedSessionId });
+  }
   emit({ type: 'turn.started' });
 
   const completed = done
